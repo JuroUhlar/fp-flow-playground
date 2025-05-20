@@ -21,7 +21,7 @@ export default function Home() {
 
   const fetchReviews = async () => {
     setLoadingReviews(true);
-    const res = await fetch("/api/reviews");
+    const res = await fetch("/api/reviews/get-reviews");
     if (res.ok) {
       const data = await res.json();
       setReviews(data);
