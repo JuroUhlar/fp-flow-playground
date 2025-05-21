@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 type Review = {
   id: number;
@@ -14,49 +15,44 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [rating, setRating] = useState(5);
   const [text, setText] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loadingReviews, setLoadingReviews] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchReviews = async () => {
-    setLoadingReviews(true);
-    const res = await fetch("/api/get-reviews");
-    if (res.ok) {
-      const data = await res.json();
-      setReviews(data);
-    }
-    setLoadingReviews(false);
-  };
+  const { data: reviews = [], isLoading: loadingReviews } = useQuery<Review[]>({
+    queryKey: ["reviews"],
+    queryFn: async () => {
+      const res = await fetch("/api/get-reviews");
+      if (!res.ok) throw new Error("Failed to fetch reviews");
+      return res.json();
+    },
+  });
 
-  useEffect(() => {
-    fetchReviews();
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setMessage("");
-
-    try {
+  const { mutate: submitReview, isPending: isSubmitting } = useMutation({
+    mutationFn: async (review: Omit<Review, "id" | "created_at">) => {
       const response = await fetch("/api/post-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, rating, text }),
+        body: JSON.stringify(review),
       });
-
       if (!response.ok) throw new Error("Failed to submit review");
-
+      return response.json();
+    },
+    onSuccess: () => {
       setMessage("Thank you for your review!");
       setEmail("");
       setRating(5);
       setText("");
-      fetchReviews();
-    } catch {
+      queryClient.invalidateQueries({ queryKey: ["reviews"] });
+    },
+    onError: () => {
       setMessage("Failed to submit review. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
+    },
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage("");
+    submitReview({ email, rating, text });
   };
 
   return (
