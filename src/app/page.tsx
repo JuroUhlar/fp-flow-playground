@@ -12,40 +12,40 @@ type Review = {
 };
 
 export default function Home() {
-  const [email, setEmail] = useState("");
-  const [rating, setRating] = useState(5);
-  const [text, setText] = useState("");
+  const [email, setEmail] = useState("test@test.com");
+  const [rating, setRating] = useState(1);
+  const [text, setText] = useState("This is a test review");
   const [message, setMessage] = useState("");
   const queryClient = useQueryClient();
 
-  const { data: reviews = [], isLoading: loadingReviews } = useQuery<Review[]>({
+  const { data: reviews = [], isLoading: loadingReviews, error: reviewsError } = useQuery<Review[]>({
     queryKey: ["reviews"],
     queryFn: async () => {
       const res = await fetch("/api/get-reviews");
-      if (!res.ok) throw new Error("Failed to fetch reviews");
+      if (!res.ok) {
+        const responseJson = await res.json().catch(() => null);
+        throw new Error(responseJson ? JSON.stringify(responseJson) : "Failed to fetch reviews");
+      }
       return res.json();
     },
   });
 
-  const { mutate: submitReview, isPending: isSubmitting } = useMutation({
+  const { mutate: submitReview, isPending: isSubmitting, error: submitError } = useMutation({
     mutationFn: async (review: Omit<Review, "id" | "created_at">) => {
       const response = await fetch("/api/post-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(review),
       });
-      if (!response.ok) throw new Error("Failed to submit review");
+      if (!response.ok) {
+        const responseJson = await response.json().catch(() => null);
+        throw new Error(responseJson ? JSON.stringify(responseJson) : "Failed to submit review");
+      }
       return response.json();
     },
     onSuccess: () => {
       setMessage("Thank you for your review!");
-      setEmail("");
-      setRating(5);
-      setText("");
       queryClient.invalidateQueries({ queryKey: ["reviews"] });
-    },
-    onError: () => {
-      setMessage("Failed to submit review. Please try again.");
     },
   });
 
@@ -115,11 +115,13 @@ export default function Home() {
         </button>
       </form>
 
-      {message && (
+      {(message || reviewsError || submitError) && (
         <div
-          className={`mt-4 p-4 rounded ${message.includes("Thank you") ? "bg-green-100" : "bg-red-100"}`}
+          className={`mt-4 p-4 rounded ${
+            message.includes("Thank you") ? "bg-green-100" : "bg-red-100"
+          }`}
         >
-          {message}
+          {message || (reviewsError as Error)?.message || (submitError as Error)?.message}
         </div>
       )}
 
@@ -135,10 +137,15 @@ export default function Home() {
               <li key={review.id} className="border rounded p-4 bg-white shadow-sm">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="font-medium">{review.email}</span>
-                  <span className="text-yellow-500">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span>
+                  <span className="text-yellow-500">
+                    {"★".repeat(review.rating)}
+                    {"☆".repeat(5 - review.rating)}
+                  </span>
                 </div>
                 <div className="mb-1 text-gray-700">{review.text}</div>
-                <div className="text-xs text-gray-400">{new Date(review.created_at).toLocaleString()}</div>
+                <div className="text-xs text-gray-400">
+                  {new Date(review.created_at).toLocaleString()}
+                </div>
               </li>
             ))}
           </ul>
