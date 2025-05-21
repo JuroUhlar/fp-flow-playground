@@ -21,7 +21,7 @@ export default function Home() {
 
   const fetchReviews = async () => {
     setLoadingReviews(true);
-    const res = await fetch("/api/reviews/get-reviews");
+    const res = await fetch("/api/get-reviews");
     if (res.ok) {
       const data = await res.json();
       setReviews(data);
@@ -39,7 +39,7 @@ export default function Home() {
     setMessage("");
 
     try {
-      const response = await fetch("/api/reviews", {
+      const response = await fetch("/api/post-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, rating, text }),
